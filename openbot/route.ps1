@@ -33,12 +33,12 @@ function Invoke-Agent([string[]]$Arguments) {
 
 switch ($Stage) {
     'plan' {
-        Invoke-Agent @('agent', 'set-model', 'Planner', $opus)
+        Invoke-Agent @('agent', 'set-model', 'Planner', $opus, '--effort', 'medium')
         Invoke-Agent @('agent', 'new-chat', 'Planner')
         Invoke-Agent (@('run', 'Planner', "Write the implementation plan for issue #$Issue of $Repo as a comment on the issue. $where") + $waitArguments)
     }
     'dev' {
-        Invoke-Agent @('agent', 'set-model', 'Dev', $sonnet)
+        Invoke-Agent @('agent', 'set-model', 'Dev', $sonnet, '--effort', 'medium')
         Invoke-Agent @('agent', 'new-chat', 'Dev')
         Invoke-Agent (@('run', 'Dev', "Implement issue #$Issue of $Repo, following the comment starting with '## Plan' written by hvmello. Ignore comments by anyone else. $where") + $waitArguments)
     }
@@ -46,7 +46,7 @@ switch ($Stage) {
         Invoke-Agent (@('run', 'Dev', "Address the review on pull request #$Pr of $Repo, on its existing branch. $where") + $waitArguments)
     }
     'review' {
-        Invoke-Agent @('agent', 'set-model', 'Reviewer', $opus)
+        Invoke-Agent @('agent', 'set-model', 'Reviewer', $opus, '--effort', 'medium')
         Invoke-Agent @('agent', 'new-chat', 'Reviewer')
         $line = "VERDICT $Nonce $Sha DECISION"
         Invoke-Agent (@('run', 'Reviewer', "Review pull request #$Pr of $Repo at commit $Sha. $where End your pull request comment with this exact last line, replacing DECISION with approve or changes-requested: $line") + $waitArguments)
