@@ -17,7 +17,7 @@ See the [roadmap](ROADMAP.md) for goals and acceptance criteria.
 
 ## How this repository is built
 
-Three agent roles (Tutor, Dev and Reviewer) work through issues and pull requests under Git Flow. Local or
-hosted models are chosen by each issue's complexity. Rules are in [AGENTS.md](AGENTS.md), and setup is in
-[openbot/](openbot/setup-openbot.md). The author reviews the work and answers the questions in each module's
+Agents work through issues and pull requests under Git Flow: Claude Opus plans and reviews, Claude Sonnet implements,
+and a local model on Ollama performs the merge. Whether a change ships is decided in code, from a verdict tied to
+the reviewed commit and green CI. Rules are in [AGENTS.md](AGENTS.md), and setup is in [openbot/](openbot/setup-openbot.md). The author reviews the work and answers the questions in each module's
 `LEARNING.md` before it is merged.

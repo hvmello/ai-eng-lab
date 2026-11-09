@@ -1,14 +1,17 @@
-# Routine
+# Automation
 
-**Keep this off until three pull requests have been run by hand and reviewed.** Then add it to the Tutor,
-for weekdays. Keep one pull request open at a time.
+`pipeline.ps1` is the routine. Windows Task Scheduler runs it on a schedule, and each run takes one issue.
 
-## Morning
+It stops and labels the issue `needs-heitor` when:
 
-If a pull request is open, or a module waits for Heitor's answers, do nothing and say so.
-Otherwise start the next task from the roadmap.
+- an agent waits for a person's approval or answer;
+- the Dev finishes without a pull request;
+- the Reviewer leaves no verdict, or has not approved after two fix rounds;
+- a pull request changes `LEARNING.md` and lacks the `heitor-answered` label.
 
-## End of day
+It never starts a new issue while a pull request is open, and never touches `main`.
 
-Post a short summary: what was done, the pull request link, and what Heitor needs to review.
-If nothing useful happened, reply "nothing to report". Do not invent work.
+Remove `needs-heitor` from an issue to let it run again. If its pull request is still open, the next run reviews
+it again at its current commit and then merges it. The log is `pipeline.log` in the workspace folder.
+
+If no issue is ready, the Planner opens the next one or replies "nothing to report". It does not invent work.

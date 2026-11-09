@@ -30,15 +30,22 @@ Spring AI and LangChain4j are compared in an ADR.
 
 ## 03-mcp-server
 
-**Learn:** the Model Context Protocol and its trust boundaries.
-**Build:** an MCP server in Java exposing tools and resources.
-**Accepted when:** it works when connected to Claude Code; tools are read-only unless stated; the protocol is
-covered by tests.
+**Learn:** the Model Context Protocol, its trust boundaries, and what a remote server needs in production.
+**Build:** a read-only MCP server in Java over Streamable HTTP, protected by OAuth, exposing three tools: list, search and read, with paginated reads.
+**Accepted when:**
+- it works when connected to Claude Code, with OAuth code flow, PKCE and dynamic client registration for public clients;
+- there is one read-only scope, and no client can reach an admin tool or widen its scope;
+- access tokens are short-lived, refresh tokens rotate, and replaying a code or refresh token is rejected;
+- authorization is checked on every read, so revoked access stops immediately;
+- the server is off by default behind configuration;
+- tests cover concurrent revocation, replay and registration limits against a disposable PostgreSQL;
+- the README separates what automated tests prove from what still needs manual validation per client.
 
 **Questions for Heitor:**
 1. What can a malicious tool description do to a client?
-2. Which transport would you deploy for a shared internal server?
-3. How does authorization differ from a normal REST API?
+2. Why check authorization on every read when the token is already valid?
+3. What remains in the client's history after revocation, and what does that mean for your privacy claims?
+4. How does authorization differ from a normal REST API?
 
 ## 04-agent-guardrails
 
