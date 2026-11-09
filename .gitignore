@@ -1,0 +1,7 @@
+target/
+.idea/
+*.iml
+.vscode/
+.env
+HANDOFF.local.md
+prompt-ai-eng-lab.md
