@@ -196,10 +196,16 @@ function Complete-Issue([string]$Repo, [int]$Issue, [int]$Pr, [string]$Head) {
     Write-Log "$Repo #${Issue}: merged in PR #$Pr at $Head."
 }
 
+# A plan already paid for is reused when a run is repeated.
+function Test-HasPlan([string]$Repo, [int]$Issue) {
+    $view = Invoke-Gh issue view $Issue --repo $Repo --json comments | ConvertFrom-Json
+    return [bool](@($view.comments) | Where-Object { $_.author.login -eq $owner -and $_.body -match '^\s*## Plan' })
+}
+
 function Invoke-Issue([string]$Repo, [int]$Issue, [switch]$Resume) {
     try {
         if (-not $Resume) {
-            Invoke-Stage $Repo $Issue 'plan'
+            if (-not (Test-HasPlan $Repo $Issue)) { Invoke-Stage $Repo $Issue 'plan' }
             Invoke-Stage $Repo $Issue 'dev'
         }
         $pr = Get-PullRequest $Repo $Issue
@@ -258,7 +264,11 @@ try {
         exit 0
     }
     Write-Log 'No issue ready in any repository.'
-    if (-not $DryRun) {
+    # An idle run costs no tokens: the Planner is asked at most once a day.
+    $stamp = Join-Path $Workspace 'planner-last-run.txt'
+    $recent = (Test-Path $stamp) -and ((Get-Item $stamp).LastWriteTime -gt (Get-Date).AddHours(-24))
+    if (-not $DryRun -and -not $recent) {
+        Set-Content -Path $stamp -Value (Get-Date).ToString('s')
         & node $cli run 'Planner' "Open the next issue from ROADMAP.md of $($Repos[0]), or reply nothing to report. Work in $Workspace." --wait --timeout 30m
     }
 } catch {
