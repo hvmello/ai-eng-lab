@@ -5,6 +5,8 @@ Written against OpenBot 0.66. It is a development preview, so labels may change.
 ## Before you start
 
 - Ollama is running with `gpt-oss:20b`, and models are stored outside the system disk through `OLLAMA_MODELS`.
+- `OLLAMA_CONTEXT_LENGTH=32768` is set. Ollama's default of 4096 is too small for coding agents and silently
+  drops context. Check with `ollama ps`; the model should show 100% GPU.
 - Claude Code is signed in with `claude auth login`.
 - `gh` is signed in. Prefer a fine-grained token limited to this repository, because a general login also reaches
   every private repository on the account.
