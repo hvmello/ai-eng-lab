@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "vendor": { "type": "string", "description": "Name of the company issuing the invoice" },
+    "currency": { "type": "string", "description": "ISO 4217 currency code, for example USD or BRL" },
+    "issueDate": { "type": "string", "format": "date", "description": "Issue date as YYYY-MM-DD" },
+    "lineItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "quantity": { "type": "integer", "description": "Number of units, a whole number" },
+          "unitPrice": { "type": "number", "description": "Price of one unit, in the invoice currency" }
+        },
+        "required": ["description", "quantity", "unitPrice"],
+        "additionalProperties": false
+      }
+    },
+    "total": { "type": "number", "description": "Total amount, in the invoice currency" }
+  },
+  "required": ["vendor", "currency", "issueDate", "lineItems", "total"],
+  "additionalProperties": false
+}
