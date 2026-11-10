@@ -23,7 +23,9 @@ public record ToolResult(boolean ok, JsonNode data, ErrorType errorType, String 
         UNKNOWN_TOOL("unknown_tool"),
         INVALID_ARGUMENTS("invalid_arguments"),
         TOOL_ERROR("tool_error"),
-        TOOL_UNAVAILABLE("tool_unavailable");
+        TOOL_UNAVAILABLE("tool_unavailable"),
+        /** A write was refused by a human or by the deny-all default; produced by module 04, never by this loop. */
+        APPROVAL_DENIED("approval_denied");
 
         private final String wire;
 

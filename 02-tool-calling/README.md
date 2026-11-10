@@ -62,7 +62,8 @@ Every tool result is one JSON envelope:
 {"ok":false,"error":{"type":"...","message":"...","retryable":true,"fields":[{"path":"latitude","problem":"..."}]}}
 ```
 
-Types: `unknown_tool`, `invalid_arguments`, `tool_error`, `tool_unavailable`. The message says what the model can
+Types: `unknown_tool`, `invalid_arguments`, `tool_error`, `tool_unavailable`, `approval_denied` (produced by
+[module 04](../04-agent-guardrails/README.md); this loop never emits it). The message says what the model can
 change. It never carries stack traces, exception class names, URLs, hosts, headers or raw upstream bodies.
 
 The application validates arguments (`Arguments`, strict Jackson plus checks in the record constructors). The schema

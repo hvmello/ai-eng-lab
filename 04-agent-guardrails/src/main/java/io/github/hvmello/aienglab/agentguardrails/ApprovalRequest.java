@@ -1,0 +1,54 @@
+package io.github.hvmello.aienglab.agentguardrails;
+
+import java.util.regex.Pattern;
+
+/**
+ * What the approver sees. The summary is built by the application from validated arguments, and it is sanitized
+ * here anyway: ANSI and control sequences are removed and the length is capped, so text planted in a note cannot
+ * redraw the prompt or fake a second one.
+ *
+ * @param tool the tool name
+ * @param step the model call that asked for it, from 1
+ * @param summary one line of plain text
+ */
+public record ApprovalRequest(String tool, int step, String summary) {
+
+    static final int MAX_SUMMARY = 200;
+
+    private static final Pattern ANSI = Pattern.compile(
+            // CSI with the 7-bit or the 8-bit introducer, then OSC (ends with BEL or ESC backslash), then other ESC pairs
+            "(?:\\u001B\\[|\\u009B)[0-?]*[ -/]*[@-~]"
+                    + "|\\u001B\\][^\\u0007\\u001B]*(?:\\u0007|\\u001B\\\\)?"
+                    + "|\\u001B[@-Z\\\\-_]");
+
+    public ApprovalRequest {
+        tool = sanitize(tool == null ? "" : tool, 64);
+        if (step < 1) {
+            throw new IllegalArgumentException("step starts at 1");
+        }
+        summary = sanitize(summary == null ? "" : summary, MAX_SUMMARY);
+    }
+
+    /** Removes ANSI sequences, turns other control characters into spaces, drops invisible format characters. */
+    static String sanitize(String text, int max) {
+        StringBuilder clean = new StringBuilder();
+        String withoutAnsi = ANSI.matcher(text).replaceAll(" ");
+        for (int i = 0; i < withoutAnsi.length(); i++) {
+            char c = withoutAnsi.charAt(i);
+            if (Character.isISOControl(c) || Character.isWhitespace(c)) {
+                clean.append(' ');
+            } else if (Character.getType(c) != Character.FORMAT) {
+                clean.append(c);
+            }
+        }
+        String line = clean.toString().replaceAll(" {2,}", " ").strip();
+        if (line.length() <= max) {
+            return line;
+        }
+        int end = max - 3;
+        if (Character.isHighSurrogate(line.charAt(end - 1))) {
+            end--;
+        }
+        return line.substring(0, end) + "...";
+    }
+}
