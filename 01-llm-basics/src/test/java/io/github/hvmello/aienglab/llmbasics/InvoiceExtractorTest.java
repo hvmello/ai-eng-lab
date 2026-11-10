@@ -1,5 +1,6 @@
 package io.github.hvmello.aienglab.llmbasics;
 
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -176,6 +177,25 @@ class InvoiceExtractorTest {
                  "lineItems":[{"description":"Dock","quantity":1,"unitPrice":12345678901234567.89}],
                  "total":12345678901234567.89}""";
         assertThat(extract(output).total()).isEqualByComparingTo(new BigDecimal("12345678901234567.89"));
+    }
+
+    @Test
+    void extremeExponentsFailQuicklyAsInvalidValues() {
+        for (String value : new String[] {"1e-500000000", "1e999999999"}) {
+            String output = """
+                    {"vendor":"Northwind Traders","currency":"USD","issueDate":"2026-03-14",
+                     "lineItems":[{"description":"Dock","quantity":1,"unitPrice":10},
+                                  {"description":"Cable","quantity":1,"unitPrice":%s}],
+                     "total":10}""".formatted(value);
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(5),
+                    () -> assertFailure(output, InvalidValue.class));
+        }
+        String hugeTotal = """
+                {"vendor":"Northwind Traders","currency":"USD","issueDate":"2026-03-14",
+                 "lineItems":[{"description":"Dock","quantity":1,"unitPrice":10}],
+                 "total":1e-500000000}""";
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(5),
+                () -> assertFailure(hugeTotal, InvalidValue.class));
     }
 
     @Test

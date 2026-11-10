@@ -85,6 +85,9 @@ public final class InvoiceExtractor {
         return parseAndValidate(result);
     }
 
+    private static final int MAX_SCALE = 10;
+    private static final int MAX_INTEGER_DIGITS = 18;
+
     static Invoice parseAndValidate(ChatResult result) {
         String raw = result.text() == null ? "" : result.text();
         if (result.finishReason() == FinishReason.LENGTH) {
@@ -138,6 +141,12 @@ public final class InvoiceExtractor {
         if (invoice.lineItems().isEmpty()) {
             throw new InvalidValue("lineItems is empty", raw);
         }
+        // Range-check every amount before any arithmetic: a huge exponent such as 1e-500000000 is a short
+        // BigDecimal, but adding it forces a number with hundreds of millions of digits.
+        requireReasonableAmount(invoice.total(), "total", raw);
+        for (int i = 0; i < invoice.lineItems().size(); i++) {
+            requireReasonableAmount(invoice.lineItems().get(i).unitPrice(), "lineItems[" + i + "].unitPrice", raw);
+        }
         BigDecimal sum = BigDecimal.ZERO;
         for (Invoice.LineItem item : invoice.lineItems()) {
             if (item.quantity() <= 0) {
@@ -153,6 +162,13 @@ public final class InvoiceExtractor {
         }
         if (sum.compareTo(invoice.total()) != 0) {
             throw new InvalidValue("line items sum to " + sum + " but total is " + invoice.total(), raw);
+        }
+    }
+
+    private static void requireReasonableAmount(BigDecimal amount, String field, String raw) {
+        if (amount.scale() > MAX_SCALE || amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
+            throw new InvalidValue(field + " is outside the supported range (scale " + amount.scale()
+                    + ", precision " + amount.precision() + ")", raw);
         }
     }
 
