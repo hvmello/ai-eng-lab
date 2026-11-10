@@ -1,8 +1,11 @@
 package io.github.hvmello.aienglab.shared;
 
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -14,6 +17,8 @@ import dev.langchain4j.model.chat.request.json.JsonRawSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +47,9 @@ final class LangChain4jLlmClient implements LlmClient {
 
     @Override
     public void stream(ChatRequest request, StreamListener listener) {
+        if (!request.tools().isEmpty()) {
+            throw new IllegalArgumentException("streaming with tools is not supported");
+        }
         CompletableFuture<Void> done = new CompletableFuture<>();
         AtomicBoolean finished = new AtomicBoolean();
         StreamingChatResponseHandler handler = new StreamingChatResponseHandler() {
@@ -103,18 +111,53 @@ final class LangChain4jLlmClient implements LlmClient {
                             .build())
                     .build());
         }
-        return dev.langchain4j.model.chat.request.ChatRequest.builder()
+        var builder = dev.langchain4j.model.chat.request.ChatRequest.builder()
                 .messages(request.messages().stream().map(LangChain4jLlmClient::toMessage).toList())
-                .parameters(parameters.build())
-                .build();
+                .parameters(parameters.build());
+        if (!request.tools().isEmpty()) {
+            builder.toolSpecifications(request.tools().stream().map(LangChain4jLlmClient::toSpecification).toList());
+        }
+        return builder.build();
     }
 
     private static ChatMessage toMessage(Message message) {
         return switch (message.role()) {
             case SYSTEM -> SystemMessage.from(message.content());
             case USER -> UserMessage.from(message.content());
-            case ASSISTANT -> AiMessage.from(message.content());
+            case ASSISTANT -> message.toolCalls().isEmpty()
+                    ? AiMessage.from(message.content())
+                    : AiMessage.from(
+                            message.content().isEmpty() ? null : message.content(),
+                            message.toolCalls().stream()
+                                    .map(call -> ToolExecutionRequest.builder()
+                                            .id(call.id())
+                                            .name(call.name())
+                                            .arguments(call.argumentsJson())
+                                            .build())
+                                    .toList());
+            case TOOL -> ToolExecutionResultMessage.from(message.toolCallId(), message.toolName(), message.content());
         };
+    }
+
+    private static ToolSpecification toSpecification(ToolSpec tool) {
+        return ToolSpecification.builder()
+                .name(tool.name())
+                .description(tool.description())
+                .parameters(JsonSchemas.toObjectSchema(tool.jsonSchema()))
+                .build();
+    }
+
+    private static List<ToolCall> toToolCalls(AiMessage message) {
+        if (message == null || !message.hasToolExecutionRequests()) {
+            return List.of();
+        }
+        List<ToolCall> calls = new ArrayList<>();
+        for (ToolExecutionRequest request : message.toolExecutionRequests()) {
+            // Some providers (Ollama) send no call id; the loop needs one to pair results with calls.
+            String id = request.id() == null || request.id().isBlank() ? "call_" + (calls.size() + 1) : request.id();
+            calls.add(new ToolCall(id, request.name(), request.arguments()));
+        }
+        return calls;
     }
 
     static ChatResult toResult(ChatResponse response) {
@@ -127,7 +170,8 @@ final class LangChain4jLlmClient implements LlmClient {
                 toFinishReason(response.finishReason()),
                 usage == null
                         ? null
-                        : new TokenUsage(usage.inputTokenCount(), usage.outputTokenCount(), usage.totalTokenCount()));
+                        : new TokenUsage(usage.inputTokenCount(), usage.outputTokenCount(), usage.totalTokenCount()),
+                toToolCalls(response.aiMessage()));
     }
 
     private static FinishReason toFinishReason(dev.langchain4j.model.output.FinishReason reason) {
