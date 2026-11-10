@@ -63,6 +63,8 @@ class RefreshAndRevocationIT extends McpIT {
     String retired = session.tokens().refreshToken();
     Tokens current = OAuthTestClient.tokens(client.refresh(session.clientId(), retired));
     assertThat(worksOnMcp(client, current.accessToken())).isTrue();
+    // Past the grace window a retired token is a stolen copy, not a parallel refresh.
+    clock.advance(java.time.Duration.ofSeconds(11));
 
     Reply replay = client.refresh(session.clientId(), retired);
 
@@ -74,6 +76,21 @@ class RefreshAndRevocationIT extends McpIT {
     Reply stillTrying = client.refresh(session.clientId(), current.refreshToken());
     assertThat(stillTrying.status()).isEqualTo(400);
     assertThat(stillTrying.json().get("error").asString()).isEqualTo("invalid_grant");
+  }
+
+  @Test
+  void aRetiredTokenInsideTheGraceWindowIsRefusedButTheFamilyKeepsWorking() {
+    OAuthTestClient client = browser();
+    Session session = client.signIn(REDIRECT);
+    Tokens current =
+        OAuthTestClient.tokens(client.refresh(session.clientId(), session.tokens().refreshToken()));
+
+    Reply late = client.refresh(session.clientId(), session.tokens().refreshToken());
+
+    assertThat(late.status()).isEqualTo(400);
+    assertThat(late.json().get("error").asString()).isEqualTo("invalid_grant");
+    assertThat(worksOnMcp(client, current.accessToken())).isTrue();
+    assertThat(client.refresh(session.clientId(), current.refreshToken()).status()).isEqualTo(200);
   }
 
   @Test
@@ -132,10 +149,12 @@ class RefreshAndRevocationIT extends McpIT {
 
       int ok = 0;
       int rejected = 0;
+      Tokens winner = null;
       for (Future<Reply> future : futures) {
         Reply reply = future.get(30, TimeUnit.SECONDS);
         if (reply.status() == 200) {
           ok++;
+          winner = OAuthTestClient.tokens(reply);
         } else {
           assertThat(reply.status()).isEqualTo(400);
           assertThat(reply.json().get("error").asString()).isEqualTo("invalid_grant");
@@ -145,6 +164,11 @@ class RefreshAndRevocationIT extends McpIT {
 
       assertThat(ok).as("successful refreshes").isEqualTo(1);
       assertThat(rejected).isEqualTo(parallel - 1);
+      // The winner is not signed out by the losers: both of its tokens still work.
+      assertThat(worksOnMcp(client, winner.accessToken())).as("winner access token").isTrue();
+      assertThat(client.refresh(session.clientId(), winner.refreshToken()).status())
+          .as("winner refresh token")
+          .isEqualTo(200);
     } finally {
       pool.shutdownNow();
     }

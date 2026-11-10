@@ -22,6 +22,23 @@ class McpFlowIT extends McpIT {
   // 1. End to end ---------------------------------------------------------------------------
 
   @Test
+  void theConsentScreenShowsWhereTheCodeWillBeSentAndThatTheNameIsUnverified() {
+    OAuthTestClient client = browser();
+    String clientId = client.registerClient("https://attacker.example/cb");
+
+    String page =
+        client.consentPage(
+            client.authorizeUrl(
+                clientId,
+                "https://attacker.example/cb",
+                OAuthTestClient.Pkce.create(),
+                "docs.read"));
+
+    assertThat(page).contains("<strong>https://attacker.example</strong>");
+    assertThat(page).contains("<strong>not verified</strong>");
+  }
+
+  @Test
   void registerLoginAuthorizeExchangeThenUseEveryTool() {
     OAuthTestClient client = browser();
 

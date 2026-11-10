@@ -35,7 +35,7 @@ the MCP server. It is built from Spring components, and only the gaps are custom
 | No refresh token for a public client on the code grant | `PublicClientRefreshTokenGenerator`. Rotation and replay detection are what make it safe |
 | No client authentication for a public client on the refresh grant and on revocation | `PublicClientRefreshAuthentication` (converter and provider), ordered before the PKCE provider |
 | `localhost` redirects need an exact port match (only IP literals vary) | `LoopbackRedirectValidator`: for `localhost`, only the port may differ |
-| A retired refresh token is just "not found" | `RefreshTokenReplayGuard` stores its SHA-256 and revokes the family when it is presented |
+| A retired refresh token is just "not found" | `RefreshTokenReplayGuard` stores its SHA-256 and revokes the family when it is presented, except inside a short grace window (default 10 s) so the loser of a parallel refresh does not sign the winner out |
 | The JDBC service has no compare-and-set, so parallel refreshes both win | `RefreshTokenLockFilter`: the token request runs in one transaction behind `SELECT ... FOR UPDATE` |
 | `resource` (RFC 8707) is ignored | `ResourceParameterFilter`: only the canonical `/mcp` URL is accepted |
 | The metadata lists grants the framework can do | The customizer keeps only `authorization_code` and `refresh_token` |

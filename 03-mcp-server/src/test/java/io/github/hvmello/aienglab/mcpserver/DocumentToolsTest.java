@@ -63,6 +63,8 @@ class DocumentToolsTest {
         Duration.ofHours(8),
         10,
         200,
+        Duration.ofDays(7),
+        Duration.ofSeconds(10),
         List.of());
   }
 

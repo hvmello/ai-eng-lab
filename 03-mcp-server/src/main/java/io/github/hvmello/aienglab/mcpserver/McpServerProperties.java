@@ -25,6 +25,8 @@ public record McpServerProperties(
     @DefaultValue("8h") Duration refreshTokenTtl,
     @DefaultValue("10") int registrationsPerIpPerHour,
     @DefaultValue("200") int maxRegisteredClients,
+    @DefaultValue("7d") Duration unusedClientTtl,
+    @DefaultValue("10s") Duration refreshReuseGrace,
     @DefaultValue List<String> allowedOrigins) {
 
   public static final String SCOPE = "docs.read";
@@ -47,6 +49,9 @@ public record McpServerProperties(
           uri.getScheme() != null && uri.getHost() != null,
           "aienglab.mcp.base-url must be an absolute URL");
     }
+    require(
+        !unusedClientTtl.isNegative() && !refreshReuseGrace.isNegative(),
+        "unused-client-ttl and refresh-reuse-grace must not be negative");
     require(pageChars > 0 && defaultLimit > 0 && maxLimit >= defaultLimit, "invalid paging limits");
   }
 

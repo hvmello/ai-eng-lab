@@ -81,6 +81,41 @@ class RegistrationLimitsIT extends McpIT {
   }
 
   @Test
+  void theGlobalCapFreesUpWhenUnusedClientsAgeOut() {
+    OAuthTestClient client = browser();
+    for (int i = 0; i < 5; i++) {
+      client.register(REDIRECT, "docs.read");
+    }
+    jdbc.update("DELETE FROM client_registration_event");
+    for (int i = 0; i < 3; i++) {
+      client.register(REDIRECT, "docs.read");
+    }
+    assertThat(client.register(REDIRECT, "docs.read").status()).isEqualTo(429);
+
+    clock.advance(java.time.Duration.ofDays(8));
+
+    assertThat(client.register(REDIRECT, "docs.read").status()).isEqualTo(201);
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM oauth2_registered_client", Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void aClientWithAnAuthorizationIsNotDeletedWhenItAgesOut() {
+    OAuthTestClient client = browser();
+    OAuthTestClient.Session session = client.signIn(REDIRECT);
+    clock.advance(java.time.Duration.ofDays(8));
+
+    assertThat(client.register(REDIRECT, "docs.read").status()).isEqualTo(201);
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM oauth2_registered_client WHERE client_id = ?",
+                Integer.class,
+                session.clientId()))
+        .isEqualTo(1);
+  }
+
+  @Test
   void parallelRegistrationsCannotOvershootTheLimit() throws Exception {
     OAuthTestClient client = browser();
     int parallel = 20;

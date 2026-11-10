@@ -89,9 +89,15 @@ public class AuthorizationServerConfig {
 
   @Bean
   OAuth2AuthorizationService authorizationService(
-      JdbcTemplate jdbc, RegisteredClientRepository clients, Clock clock) {
+      JdbcTemplate jdbc,
+      RegisteredClientRepository clients,
+      Clock clock,
+      McpServerProperties properties) {
     return new RefreshTokenReplayGuard(
-        new JdbcOAuth2AuthorizationService(jdbc, clients), jdbc, clock);
+        new JdbcOAuth2AuthorizationService(jdbc, clients),
+        jdbc,
+        clock,
+        properties.refreshReuseGrace());
   }
 
   @Bean

@@ -192,6 +192,15 @@ final class OAuthTestClient {
    * location, either {@code redirect_uri?code=...} or {@code redirect_uri?error=...}.
    */
   String authorizeAndConsent(String authorizeUrl) {
+    return walkAuthorize(authorizeUrl, false);
+  }
+
+  /** Runs the same walk but stops at the consent screen and returns its HTML. */
+  String consentPage(String authorizeUrl) {
+    return walkAuthorize(authorizeUrl, true);
+  }
+
+  private String walkAuthorize(String authorizeUrl, boolean stopAtConsent) {
     Reply reply = get(authorizeUrl);
     List<String> trail = new ArrayList<>();
     for (int hops = 0; hops < 8; hops++) {
@@ -211,6 +220,9 @@ final class OAuthTestClient {
                 "/login",
                 Map.of("username", user, "password", password, "_csrf", find(CSRF, reply.body())));
       } else if (reply.body() != null && reply.body().contains("Authorize access")) {
+        if (stopAtConsent) {
+          return reply.body();
+        }
         reply =
             postForm(
                 "/oauth2/authorize",

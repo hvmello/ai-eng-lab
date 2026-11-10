@@ -48,10 +48,10 @@ login and consent, and stores the tokens.
 | Part | How |
 |---|---|
 | Discovery | `/.well-known/oauth-protected-resource[/mcp]` (RFC 9728, Spring Security 7) and `/.well-known/oauth-authorization-server` (RFC 8414). Unauthenticated `/mcp` gets `401` with `WWW-Authenticate: Bearer resource_metadata="..."` |
-| Flow | Authorization code, PKCE `S256` required, public clients only, login form and consent screen for the one configured user |
+| Flow | Authorization code, PKCE `S256` required, public clients only, login form and consent screen for the one configured user. The consent screen labels the client name as unverified and shows the host the code will be sent to |
 | Tokens | Opaque (reference) tokens. Access: 5 min. Refresh: 8 h, rotated on every use |
-| Registration | `POST /register` (RFC 7591): `token_endpoint_auth_method=none`, grants within `{authorization_code, refresh_token}`, scope within `{docs.read}`, `https` or loopback redirects. Limits in PostgreSQL: 10 per IP per hour, 200 clients in total |
-| Replay | A reused code revokes what it issued. A reused refresh token revokes the whole family. N parallel refreshes with one token: exactly one wins (row lock) |
+| Registration | `POST /register` (RFC 7591): `token_endpoint_auth_method=none`, grants within `{authorization_code, refresh_token}`, scope within `{docs.read}`, `https` or loopback redirects. Limits in PostgreSQL: 10 per IP per hour, 200 clients in total. Clients with no authorization after 7 days are deleted, so the cap frees up |
+| Replay | A reused code revokes what it issued. A reused refresh token revokes the whole family, unless it was retired less than 10 s ago (`aienglab.mcp.refresh-reuse-grace`): that is the loser of a parallel refresh, which gets `invalid_grant` while the winner keeps its session. N parallel refreshes with one token: exactly one wins (row lock) |
 | Every read | The bearer token is looked up in the database on every request, and `docs.read` is checked again in the tool, so a revoked client stops on its next call, including mid-pagination |
 | Revocation | `/oauth2/revoke` (RFC 7009), also for public clients |
 | Resource parameter | RFC 8707: `resource` is accepted only when it is the canonical `/mcp` URL |
@@ -59,7 +59,7 @@ login and consent, and stores the tokens.
 
 ## What the automated tests prove
 
-`./mvnw verify` runs 55 unit tests and 42 integration tests. The integration tests (`*IT`, failsafe) start the whole
+`./mvnw verify` runs 55 unit tests and 46 integration tests. The integration tests (`*IT`, failsafe) start the whole
 application on a real port against a disposable PostgreSQL from Testcontainers, so **Docker must be running**
 (`-DskipITs` skips them, for local use only; CI runs them). Credentials are generated at run time.
 
@@ -72,10 +72,11 @@ application on a real port against a disposable PostgreSQL from Testcontainers, 
 | `scope=admin` cannot be registered, extra scope on authorize and on refresh is `invalid_scope`, `tools/list` is exactly three tools, resources and prompts are empty | `McpFlowIT` |
 | `401` with `resource_metadata`, metadata documents, bad `Origin` gets `403`, `resource` must be the MCP URL | `McpFlowIT` |
 | refresh rotates, replaying a retired token revokes the family, another client's token is refused, expiry | `RefreshAndRevocationIT` |
-| 8 parallel refreshes with one token: exactly one succeeds (fails with 8 successes when the row lock is removed) | `RefreshAndRevocationIT` |
+| 8 parallel refreshes with one token: exactly one succeeds and its access and refresh tokens still work (fails with 8 successes when the row lock is removed); a retired token inside the grace window does not revoke the family | `RefreshAndRevocationIT` |
 | reads on 6 threads, then revoke: nothing started after revoke returned is served; page 1, revoke, page 2 fails | `RefreshAndRevocationIT` |
-| per-IP and global limits trip, also under 20 parallel registrations; confidential auth methods, non-loopback `http` redirects and extra grants are rejected | `RegistrationLimitsIT` |
+| per-IP and global limits trip, also under 20 parallel registrations; unused clients age out and free the cap; confidential auth methods, non-loopback `http` redirects and extra grants are rejected | `RegistrationLimitsIT` |
 | off by default: `main` returns without listening on 8080; enabled without credentials fails startup | `OffByDefaultTest` |
+| the consent screen shows the redirect host and the unverified label | `McpFlowIT` |
 | cursors: round trip, tampering, other key, other tool, other query; limits capped; every registration rule | `CursorTest`, `DocumentToolsTest`, `ClientRegistrationPolicyTest` |
 
 ## What still needs manual validation
@@ -97,6 +98,7 @@ Other gaps to know about:
   clients would share one address.
 - `Origin` is validated inside the MCP handler, so an unauthenticated request with a bad `Origin` is answered `401`
   before it is answered `403`.
+- The grace window (10 s) is a trade-off: a stolen retired token replayed inside it is refused but does not revoke the family.
 - Retired refresh token hashes are kept forever in `retired_refresh_token`.
 
 ## Running the tests where loopback traffic is filtered

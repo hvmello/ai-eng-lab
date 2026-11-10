@@ -13,7 +13,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Registration limits kept in PostgreSQL, so they hold across instances: registrations per IP per
- * hour, and a global cap on registered clients. The check and the insert run in one transaction
+ * hour, and a global cap on registered clients. Clients with no authorization
+ * after {@code unusedClientTtl} are deleted before the cap is checked, so the cap does not fill up for good. The check and the insert run in one transaction
  * behind an advisory lock, so parallel registrations cannot overshoot a limit.
  */
 public class RegistrationLimiter {
@@ -33,6 +34,7 @@ public class RegistrationLimiter {
   private final Clock clock;
   private final int perIpPerHour;
   private final int maxClients;
+  private final Duration unusedClientTtl;
 
   public RegistrationLimiter(
       JdbcTemplate jdbc,
@@ -46,6 +48,7 @@ public class RegistrationLimiter {
     this.clock = clock;
     this.perIpPerHour = properties.registrationsPerIpPerHour();
     this.maxClients = properties.maxRegisteredClients();
+    this.unusedClientTtl = properties.unusedClientTtl();
   }
 
   /**
@@ -70,6 +73,12 @@ public class RegistrationLimiter {
           if (fromIp != null && fromIp >= perIpPerHour) {
             throw new LimitExceededException("too many registrations from this address");
           }
+          // Clients that never got an authorization are abandoned or abusive: free their slot.
+          jdbc.update(
+              "DELETE FROM oauth2_registered_client c WHERE c.client_id_issued_at < ?"
+                  + " AND NOT EXISTS (SELECT 1 FROM oauth2_authorization a"
+                  + " WHERE a.registered_client_id = c.id)",
+              OffsetDateTime.ofInstant(now.minus(unusedClientTtl), ZoneOffset.UTC));
           Integer total = jdbc.queryForObject("SELECT count(*) FROM oauth2_registered_client", Integer.class);
           if (total != null && total >= maxClients) {
             throw new LimitExceededException("the server has reached its limit of registered clients");
