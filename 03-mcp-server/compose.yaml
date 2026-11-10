@@ -1,0 +1,20 @@
+# Local PostgreSQL for manual runs of the MCP server. The integration tests do not use this file:
+# they start their own disposable database with Testcontainers.
+#
+#   docker compose --env-file ../.env -f compose.yaml up -d
+#
+# Set MCP_DB_USER and MCP_DB_PASSWORD in .env. No default password is committed.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: mcp
+      POSTGRES_USER: ${MCP_DB_USER:?set MCP_DB_USER in .env}
+      POSTGRES_PASSWORD: ${MCP_DB_PASSWORD:?set MCP_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - mcp-data:/var/lib/postgresql/data
+
+volumes:
+  mcp-data:
