@@ -54,6 +54,12 @@ class ApprovalRequestTest {
     }
 
     @Test
+    void defaultIgnorableCharactersAreShownAsVisibleEscapes() {
+        assertThat(summary("a️b͏cㅤd­e")).isEqualTo("a\\" + "u{FE0F}b\\" + "u{34F}c\\" + "u{3164}d\\" + "u{AD}e");
+        assertThat(summary("x" + new String(Character.toChars(0xE0100)) + "y")).isEqualTo("x\\" + "u{E0100}y");
+    }
+
+    @Test
     void longSummariesAreTruncated() {
         String clean = summary("x".repeat(500));
 

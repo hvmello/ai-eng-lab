@@ -128,6 +128,33 @@ class NoteToolsTest {
     }
 
     @Test
+    void writeRejectsDefaultIgnorableCodePointsAndTheApproverIsNeverAsked() {
+        int[] codePoints = {0xFE0F, 0xE0100, 0x034F, 0x180B, 0x115F, 0x1160, 0x3164, 0xFFA0, 0x00AD, 0x061C,
+            0x17B4, 0x2060, 0xFFF0, 0x1BCA0, 0x1D173, 0xE0FFF};
+        for (int cp : codePoints) {
+            String content = "ok" + new String(Character.toChars(cp)) + "ok";
+            assertThat(WriteNoteTool.hasInvisibleCharacter(content)).as("U+%04X", cp).isTrue();
+
+            var approver = StubApprover.approving();
+            String args = "{\"name\":\"a\",\"content\":\"" + content + "\"}";
+            var client = RecordedLlmClient.of(
+                    RecordedLlmClient.asks(1, 1, RecordedLlmClient.call("c1", "write_note", args)),
+                    RecordedLlmClient.says("ok", 1, 1));
+            var store = new NoteStore();
+            var outcome = new GuardedAgent(client, java.util.List.of(new WriteNoteTool(store).asAgentTool()),
+                    Budget.defaults(), approver).run("q");
+
+            assertThat(approver.requests).as("U+%04X", cp).isEmpty();
+            assertThat(store.exists("a")).isFalse();
+            assertThat(outcome.transcript().stream()
+                    .filter(m -> m.role() == io.github.hvmello.aienglab.shared.Message.Role.TOOL)
+                    .map(io.github.hvmello.aienglab.shared.Message::content))
+                    .anyMatch(m -> m.contains("invalid_arguments"));
+        }
+        assertThat(WriteNoteTool.hasInvisibleCharacter("naïve éè 中文")).isFalse();
+    }
+
+    @Test
     void writeExecutesAndReportsCreatedOrOverwritten() throws Exception {
         var store = new NoteStore();
         var tool = new WriteNoteTool(store);

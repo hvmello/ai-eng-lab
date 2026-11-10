@@ -48,7 +48,7 @@ public record ApprovalRequest(String tool, int step, String summary, String deta
         withoutAnsi.codePoints().forEach(cp -> {
             if (Character.isISOControl(cp) || Character.isWhitespace(cp)) {
                 clean.append(' ');
-            } else if (Character.getType(cp) == Character.FORMAT || cp >= 0xE0000 && cp <= 0xE007F) {
+            } else if (InvisibleText.isInvisible(cp)) {
                 clean.append('\\').append("u{").append(Integer.toHexString(cp).toUpperCase(java.util.Locale.ROOT)).append('}');
             } else {
                 clean.appendCodePoint(cp);

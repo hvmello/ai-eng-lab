@@ -20,20 +20,18 @@ public final class WriteNoteTool implements Tool<WriteNoteTool.Args> {
                     .require(content == null || content.length() <= NoteStore.MAX_CONTENT_CHARS, "content",
                             "must be at most " + NoteStore.MAX_CONTENT_CHARS + " characters")
                     .require(content == null || !hasInvisibleCharacter(content), "content",
-                            "must not contain control, format or tag characters (only newline and tab are allowed)")
+                            "must not contain control, format, tag or other default-ignorable characters (only newline and tab are allowed)")
                     .verify();
         }
     }
 
     /**
      * True when the content has a code point the approver could not see: a control character other than newline and
-     * tab, a format character (zero width, bidi) or a Unicode tag character (U+E0000 to U+E007F). Walks code points,
+     * tab, a format character (zero width, bidi) or any Default_Ignorable_Code_Point (variation selectors, fillers, tags). Walks code points,
      * because supplementary characters are two {@code char}s and never report FORMAT per {@code char}.
      */
     static boolean hasInvisibleCharacter(String content) {
-        return content.codePoints().anyMatch(cp -> cp != '\n' && cp != '\t' && Character.isISOControl(cp)
-                || Character.getType(cp) == Character.FORMAT
-                || cp >= 0xE0000 && cp <= 0xE007F);
+        return content.codePoints().anyMatch(cp -> cp != '\n' && cp != '\t' &&InvisibleText.isInvisible(cp));
     }
 
     private static final ToolSpec SPEC = new ToolSpec(
