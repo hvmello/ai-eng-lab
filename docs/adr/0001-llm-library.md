@@ -4,7 +4,7 @@
 
 ## Decision
 
-LangChain4j is the default. Module 02 also implements its tools with Spring AI, to compare the two.
+LangChain4j is the default. Module 02 also implements its tools with Spring AI, to compare the two. See [ADR 0002](0002-tool-calling-spring-ai-vs-langchain4j.md): the second adapter lives in module 02.
 
 ## Why
 

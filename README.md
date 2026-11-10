@@ -3,12 +3,12 @@
 Hands-on AI engineering modules in Java, built by a senior backend engineer moving into the field. Every
 module runs on local models through Ollama at no cost, with hosted providers optional.
 
-> **Status: module 01 is implemented.** The other modules are still planned.
+> **Status: modules 01 and 02 are implemented.** The other modules are still planned.
 
 | Module | Topic | Status |
 |---|---|---|
 | [01-llm-basics](01-llm-basics/README.md) | Chat, streaming, parameters, structured output into Java records | Implemented |
-| 02-tool-calling | Java tools, invalid calls and error handling | Planned |
+| [02-tool-calling](02-tool-calling/README.md) | Java tools, invalid calls and error handling, with LangChain4j and Spring AI | Implemented |
 | [03-mcp-server](03-mcp-server/README.md) | A read-only MCP server in Java over Streamable HTTP, behind OAuth | Implemented, not yet validated with a real client |
 | 04-agent-guardrails | Tool loop, step limits, permissions, prompt injection tests | Planned |
 | 08-capstone | [evidence-gate](https://github.com/hvmello/evidence-gate): RAG, evaluation, guardrails and observability | In progress |
