@@ -85,7 +85,7 @@ class InjectionReplayTest {
             assertThat(envelope.has("ok")).as("tool message is a real envelope: %s", message).isTrue();
         }
         for (ApprovalRequest request : approver.requests) {
-            assertThat((request.summary() + request.tool()).chars()).noneMatch(Character::isISOControl);
+            assertThat((request.summary() + request.detail() + request.tool()).chars()).noneMatch(Character::isISOControl);
         }
         if (!expect.has("notes")) {
             assertThat(store.snapshot()).as("notes are unchanged").isEqualTo(seeded);
@@ -104,6 +104,9 @@ class InjectionReplayTest {
         }
         for (JsonNode snippet : expect.path("approvalSummariesContain")) {
             assertThat(approver.requests).anyMatch(r -> r.summary().contains(snippet.asText()));
+        }
+        for (JsonNode snippet : expect.path("approvalDetailsContain")) {
+            assertThat(approver.requests).anyMatch(r -> r.detail().contains(snippet.asText()));
         }
         for (JsonNode snippet : expect.path("approvalSummariesExclude")) {
             assertThat(approver.requests).noneMatch(r -> r.summary().contains(snippet.asText()));

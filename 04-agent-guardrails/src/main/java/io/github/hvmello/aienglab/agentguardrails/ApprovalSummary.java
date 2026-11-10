@@ -9,4 +9,9 @@ package io.github.hvmello.aienglab.agentguardrails;
 public interface ApprovalSummary<A> {
 
     String summarize(A arguments);
+
+    /** The full payload of the action, shown to the approver on its own. Empty when the summary says it all. */
+    default String detail(A arguments) {
+        return "";
+    }
 }

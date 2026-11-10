@@ -25,6 +25,9 @@ public final class ConsoleApprover implements Approver {
     @Override
     public Decision decide(ApprovalRequest request) {
         out.println("Approval needed [step " + request.step() + "] " + request.tool() + ": " + request.summary());
+        if (!request.detail().isEmpty()) {
+            out.println("Full content: " + request.detail());
+        }
         out.print("Allow? [y/N] ");
         out.flush();
         try {

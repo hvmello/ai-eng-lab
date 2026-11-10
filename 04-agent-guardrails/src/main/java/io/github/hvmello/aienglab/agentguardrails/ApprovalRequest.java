@@ -10,10 +10,13 @@ import java.util.regex.Pattern;
  * @param tool the tool name
  * @param step the model call that asked for it, from 1
  * @param summary one line of plain text
+ * @param detail everything the action will write, sanitized and never cut: the approver must see all of it
  */
-public record ApprovalRequest(String tool, int step, String summary) {
+public record ApprovalRequest(String tool, int step, String summary, String detail) {
 
     static final int MAX_SUMMARY = 200;
+    /** Cap on the detail. Larger than any tool input (a note is at most 2,000 characters), so it never cuts. */
+    static final int MAX_DETAIL = 4_000;
 
     private static final Pattern ANSI = Pattern.compile(
             // CSI with the 7-bit or the 8-bit introducer, then OSC (ends with BEL or ESC backslash), then other ESC pairs
@@ -27,6 +30,11 @@ public record ApprovalRequest(String tool, int step, String summary) {
             throw new IllegalArgumentException("step starts at 1");
         }
         summary = sanitize(summary == null ? "" : summary, MAX_SUMMARY);
+        detail = sanitize(detail == null ? "" : detail, MAX_DETAIL);
+    }
+
+    public ApprovalRequest(String tool, int step, String summary) {
+        this(tool, step, summary, "");
     }
 
     /** Removes ANSI sequences, turns other control characters into spaces, drops invisible format characters. */

@@ -12,8 +12,6 @@ import java.util.Objects;
 /** WRITE: creates or overwrites a note. The only dangerous action in this workspace. */
 public final class WriteNoteTool implements Tool<WriteNoteTool.Args> {
 
-    static final int PREVIEW_CHARS = 80;
-
     public record Args(String name, String content) {
         public Args {
             new Arguments.Checks()
@@ -40,16 +38,23 @@ public final class WriteNoteTool implements Tool<WriteNoteTool.Args> {
     }
 
     public AgentTool<Args> asAgentTool() {
-        return AgentTool.write(this, this::summarize);
+        return AgentTool.write(this, new ApprovalSummary<Args>() {
+            @Override
+            public String summarize(Args args) {
+                return WriteNoteTool.this.summarize(args);
+            }
+
+            @Override
+            public String detail(Args args) {
+                return args.content();
+            }
+        });
     }
 
-    /** What the approver reads: the action, the target and the start of the new content. */
+    /** What the approver reads first: the action and the target. The content itself goes in the detail, whole. */
     String summarize(Args args) {
         String verb = store.exists(args.name()) ? "overwrite" : "create";
-        String preview = args.content().length() <= PREVIEW_CHARS
-                ? args.content()
-                : args.content().substring(0, PREVIEW_CHARS) + "...";
-        return verb + " note '" + args.name() + "' with " + args.content().length() + " characters: " + preview;
+        return verb + " note '" + args.name() + "' with " + args.content().length() + " characters";
     }
 
     @Override

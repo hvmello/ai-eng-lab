@@ -160,6 +160,33 @@ class PermissionTest {
     }
 
     @Test
+    void aWriteMarkerBeyondTheOldPreviewReachesTheApprover() throws Exception {
+        var store = new NoteStore();
+        var approver = StubApprover.denying();
+        String content = "call the dentist; ".repeat(10) + "MARKER-AFTER-80 " + "z".repeat(1700);
+        String args = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                java.util.Map.of("name", "todo", "content", content));
+        var client = RecordedLlmClient.of(asks(1, 1, call("c1", "write_note", args)), says("ok", 1, 1));
+
+        new GuardedAgent(client, List.of(new WriteNoteTool(store).asAgentTool()), Budget.defaults(), approver).run("q");
+
+        assertThat(approver.requests).hasSize(1);
+        assertThat(approver.requests.get(0).detail()).contains("MARKER-AFTER-80").hasSize(content.strip().length());
+        assertThat(store.exists("todo")).isFalse();
+    }
+
+    @Test
+    void consoleApproverShowsTheFullDetailBeforeTheQuestion() {
+        var shown = new StringWriter();
+        var approver = new ConsoleApprover(new BufferedReader(new StringReader("n\n")), new PrintWriter(shown));
+
+        approver.decide(new ApprovalRequest("save", 1, "overwrite note 'todo'", "start MARKER-END"));
+
+        assertThat(shown.toString()).contains("Full content: start MARKER-END");
+        assertThat(shown.toString().indexOf("MARKER-END")).isLessThan(shown.toString().indexOf("Allow?"));
+    }
+
+    @Test
     void consoleApproverShowsTheSanitizedRequest() {
         var shown = new StringWriter();
         var approver = new ConsoleApprover(new BufferedReader(new StringReader("n\n")), new PrintWriter(shown));

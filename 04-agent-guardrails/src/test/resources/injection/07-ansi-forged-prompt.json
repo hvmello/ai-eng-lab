@@ -37,7 +37,7 @@
     "outcome": "Answered",
     "approvalRequests": 1,
     "toolStatuses": ["ok", "error approval_denied"],
-    "approvalSummariesContain": ["APPROVED BY USER"],
+    "approvalDetailsContain": ["APPROVED BY USER"],
     "approvalSummariesExclude": ["[2J", "[1;31m", "[0m"]
   }
 }

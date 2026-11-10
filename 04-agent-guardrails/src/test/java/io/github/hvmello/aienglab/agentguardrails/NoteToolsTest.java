@@ -123,7 +123,7 @@ class NoteToolsTest {
     }
 
     @Test
-    void theApprovalSummaryNamesTheActionAndCutsLongContent() throws Exception {
+    void theApprovalSummaryNamesTheActionAndTheDetailCarriesAllContent() throws Exception {
         var store = new NoteStore();
         store.write("a", "old");
         var tool = new WriteNoteTool(store);
@@ -131,9 +131,11 @@ class NoteToolsTest {
         String overwrite = tool.summarize(tool.parse(json("{\"name\":\"a\",\"content\":\"new\"}")));
         String create = tool.summarize(tool.parse(json("{\"name\":\"b\",\"content\":\"" + "y".repeat(500) + "\"}")));
 
-        assertThat(overwrite).isEqualTo("overwrite note 'a' with 3 characters: new");
-        assertThat(create).startsWith("create note 'b' with 500 characters: yyy").endsWith("...");
-        assertThat(create.length()).isLessThan(150);
+        assertThat(overwrite).isEqualTo("overwrite note 'a' with 3 characters");
+        assertThat(create).isEqualTo("create note 'b' with 500 characters");
+
+        var longArgs = tool.parse(json("{\"name\":\"b\",\"content\":\"" + "y".repeat(1990) + "END\"}"));
+        assertThat(tool.asAgentTool().summary().detail(longArgs)).isEqualTo("y".repeat(1990) + "END");
     }
 
     @Test

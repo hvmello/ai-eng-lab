@@ -92,8 +92,8 @@ The worst thing this agent can do is overwrite a note with something wrong (`wri
 3. There is no network or shell tool, so an injected instruction has no channel to send data out or run a command.
 4. The budget bounds how long a manipulated model can keep trying.
 
-A human who approves without reading defeats gate 1. That is why the summary is short, plain and bounded, and why the
-number of questions per run is capped.
+A human who approves without reading defeats gate 1. That is why the summary is one short plain line, why the approver
+also gets the whole content to be written (sanitized, never cut), and why the number of questions per run is capped.
 
 ## What the tests prove, and what needs a real model
 
@@ -110,6 +110,7 @@ file has the planted notes, the user question, the recorded model turns and the 
 | 06 | The model retries a denied write | Answered from the record; the approver is asked once |
 | 07 | ANSI and newlines try to forge the prompt | The request shows plain single-line text |
 | 08 | The model passes `approved: true` | `invalid_arguments`, the approver is never reached |
+| 09 | The write opens with harmless text and hides the payload after character 80 | The approver is shown the whole content |
 
 The test also checks that every recorded turn is used, so a stale recording fails loudly, and that no case lets a note
 change unless the fixture says so. Adding a case is adding a JSON file.
@@ -127,5 +128,5 @@ tests never call a model, and CI never records.
 This writes `source`, `question`, the seeded notes and the turns the model gave. To turn it into a case, copy the file
 into `src/test/resources/injection/`, plant the attack in `notes`, add `approver`, `budget` if needed and `expect`
 (`outcome`, `approvalRequests`, and optionally `toolStatuses`, `toolDataContains`, `approvalSummariesContain`,
-`approvalSummariesExclude`), and change `source` to `recorded`. Check Ollama reports token usage on this run: if it
+`approvalDetailsContain`, `approvalSummariesExclude`), and change `source` to `recorded`. Check Ollama reports token usage on this run: if it
 does not, every run stops with `USAGE_UNREPORTED` by design.

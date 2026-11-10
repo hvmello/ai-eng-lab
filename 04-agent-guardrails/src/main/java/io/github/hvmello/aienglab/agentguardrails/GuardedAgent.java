@@ -230,7 +230,8 @@ public final class GuardedAgent {
         }
         state.approvalRequests++;
         try {
-            ApprovalRequest request = new ApprovalRequest(entry.name(), step, entry.summary().summarize(typed));
+            ApprovalRequest request = new ApprovalRequest(
+                    entry.name(), step, entry.summary().summarize(typed), entry.summary().detail(typed));
             if (approver.decide(request) == Approver.Decision.APPROVED) {
                 return null;
             }
