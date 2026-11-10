@@ -108,6 +108,18 @@ class MainTest {
     }
 
     @Test
+    void extremeExponentIsAnExtractionFailureNotBadUsage() {
+        var c = new Capture();
+        String json = "{\"vendor\":\"A\",\"currency\":\"USD\",\"issueDate\":\"2026-03-14\","
+                + "\"lineItems\":[{\"description\":\"d\",\"quantity\":1,\"unitPrice\":1e-2147483648}],\"total\":5}";
+
+        int code = Main.run(new String[] {"extract"}, client(json, false), c.out, c.err);
+
+        assertThat(code).isEqualTo(1);
+        assertThat(c.err()).contains("InvalidValue").contains("Raw output:");
+    }
+
+    @Test
     void badUsageGivesExitCodeTwo() {
         var c = new Capture();
 

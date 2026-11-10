@@ -104,12 +104,17 @@ public final class InvoiceExtractor {
             throw new MalformedJson("Model output is not valid JSON: " + e.getOriginalMessage(), raw, e);
         } catch (JsonProcessingException e) {
             throw new MalformedJson("Model output is not a single JSON value: " + e.getOriginalMessage(), raw, e);
+        } catch (NumberFormatException e) {
+            // Jackson rejects an exponent beyond the int range with a raw NumberFormatException.
+            throw new InvalidValue("a number in the output is outside the supported range: " + e.getMessage(), raw);
         }
         Invoice invoice;
         try {
             invoice = MAPPER.treeToValue(tree, Invoice.class);
         } catch (JsonProcessingException e) {
             throw new SchemaMismatch("JSON does not match the invoice schema: " + e.getOriginalMessage(), raw, e);
+        } catch (NumberFormatException e) {
+            throw new InvalidValue("a number in the output is outside the supported range: " + e.getMessage(), raw);
         }
         if (invoice == null) {
             throw new SchemaMismatch("JSON is null, expected an invoice object", raw, null);
