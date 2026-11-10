@@ -43,7 +43,8 @@ class ToolResultTest {
     void errorTypesKeepTheirWireNames() {
         assertThat(ToolResult.ErrorType.values())
                 .extracting(ToolResult.ErrorType::wire)
-                .containsExactly("unknown_tool", "invalid_arguments", "tool_error", "tool_unavailable");
+                .containsExactly("unknown_tool", "invalid_arguments", "tool_error", "tool_unavailable",
+                        "approval_denied");
     }
 
     @Test

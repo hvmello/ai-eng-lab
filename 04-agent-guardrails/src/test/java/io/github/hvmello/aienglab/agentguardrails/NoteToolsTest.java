@@ -1,0 +1,193 @@
+package io.github.hvmello.aienglab.agentguardrails;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.hvmello.aienglab.toolcalling.InvalidArgumentsException;
+import io.github.hvmello.aienglab.toolcalling.ToolFailure;
+import org.junit.jupiter.api.Test;
+
+class NoteToolsTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private static JsonNode json(String text) throws Exception {
+        return JSON.readTree(text);
+    }
+
+    @Test
+    void nameValidation() {
+        assertThat(NoteStore.validName("todo-2")).isTrue();
+        assertThat(NoteStore.validName("a".repeat(40))).isTrue();
+        assertThat(NoteStore.validName("a".repeat(41))).isFalse();
+        assertThat(NoteStore.validName("")).isFalse();
+        assertThat(NoteStore.validName(null)).isFalse();
+        assertThat(NoteStore.validName("../etc/passwd")).isFalse();
+        assertThat(NoteStore.validName("Todo")).isFalse();
+        assertThat(NoteStore.validName("a b")).isFalse();
+        assertThat(NoteStore.validName("a\n")).isFalse();
+    }
+
+    @Test
+    void writeCreatesThenOverwrites() {
+        var store = new NoteStore();
+
+        assertThat(store.write("a", "one")).isTrue();
+        assertThat(store.write("a", "two")).isFalse();
+        assertThat(store.read("a")).contains("two");
+        assertThat(store.read("missing")).isEmpty();
+        assertThat(store.names()).containsExactly("a");
+    }
+
+    @Test
+    void sizeCaps() {
+        var store = new NoteStore();
+
+        assertThatThrownBy(() -> store.write("a", "x".repeat(NoteStore.MAX_CONTENT_CHARS + 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.write("Bad Name", "x")).isInstanceOf(IllegalArgumentException.class);
+        for (int i = 0; i < NoteStore.MAX_NOTES; i++) {
+            store.write("n" + i, "x");
+        }
+        assertThatThrownBy(() -> store.write("one-more", "x")).isInstanceOf(IllegalArgumentException.class);
+        store.write("n0", "overwriting an existing note is still fine");
+        assertThat(store.names()).hasSize(NoteStore.MAX_NOTES);
+    }
+
+    @Test
+    void listReturnsNames() throws Exception {
+        var store = new NoteStore();
+        store.write("b", "1");
+        store.write("a", "2");
+        var tool = new ListNotesTool(store);
+
+        JsonNode data = tool.execute(tool.parse(json("{}")));
+
+        assertThat(data.toString()).isEqualTo("{\"notes\":[\"a\",\"b\"]}");
+    }
+
+    @Test
+    void listRejectsAnyArgument() {
+        var tool = new ListNotesTool(new NoteStore());
+
+        assertThatThrownBy(() -> tool.parse(json("{\"approved\":true}"))).isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("[]"))).isInstanceOf(InvalidArgumentsException.class);
+    }
+
+    @Test
+    void readReturnsTheContentOrAFailure() throws Exception {
+        var store = new NoteStore();
+        store.write("a", "hello");
+        var tool = new ReadNoteTool(store);
+
+        assertThat(tool.execute(tool.parse(json("{\"name\":\"a\"}"))).toString())
+                .isEqualTo("{\"name\":\"a\",\"content\":\"hello\"}");
+        assertThatThrownBy(() -> tool.execute(tool.parse(json("{\"name\":\"zzz\"}"))))
+                .isInstanceOfSatisfying(ToolFailure.class, f -> assertThat(f.retryable()).isFalse());
+    }
+
+    @Test
+    void readValidatesTheName() {
+        var tool = new ReadNoteTool(new NoteStore());
+
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"../x\"}"))).isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{}"))).isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":5}"))).isInstanceOf(InvalidArgumentsException.class);
+    }
+
+    @Test
+    void writeValidatesStrictly() {
+        var tool = new WriteNoteTool(new NoteStore());
+
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\"}"))).isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\",\"content\":\"x\",\"approved\":true}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"A\",\"content\":\"x\"}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\",\"content\":\"" + "x".repeat(3000) + "\"}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+    }
+
+    @Test
+    void writeRejectsContentTheApproverCouldNotSee() {
+        var tool = new WriteNoteTool(new NoteStore());
+        String tagged = "buy bread" + new String(Character.toChars(0xE0041));
+
+        assertThat(WriteNoteTool.hasInvisibleCharacter(tagged)).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("a\u200Bb")).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("a\u202Eb")).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("a\u001B[2Jb")).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("line one\n\tline two")).isFalse();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("caf\u00E9 \uD83D\uDE00")).isFalse();
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\",\"content\":\"x\u200By\"}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\",\"content\":\"x\uDB40\uDC41y\"}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+    }
+
+    @Test
+    void writeRejectsDefaultIgnorableCodePointsAndTheApproverIsNeverAsked() {
+        int[] codePoints = {0xFE0F, 0xE0100, 0x034F, 0x180B, 0x115F, 0x1160, 0x3164, 0xFFA0, 0x00AD, 0x061C,
+            0x17B4, 0x2060, 0xFFF0, 0x1BCA0, 0x1D173, 0xE0FFF};
+        for (int cp : codePoints) {
+            String content = "ok" + new String(Character.toChars(cp)) + "ok";
+            assertThat(WriteNoteTool.hasInvisibleCharacter(content)).as("U+%04X", cp).isTrue();
+
+            var approver = StubApprover.approving();
+            String args = "{\"name\":\"a\",\"content\":\"" + content + "\"}";
+            var client = RecordedLlmClient.of(
+                    RecordedLlmClient.asks(1, 1, RecordedLlmClient.call("c1", "write_note", args)),
+                    RecordedLlmClient.says("ok", 1, 1));
+            var store = new NoteStore();
+            var outcome = new GuardedAgent(client, java.util.List.of(new WriteNoteTool(store).asAgentTool()),
+                    Budget.defaults(), approver).run("q");
+
+            assertThat(approver.requests).as("U+%04X", cp).isEmpty();
+            assertThat(store.exists("a")).isFalse();
+            assertThat(outcome.transcript().stream()
+                    .filter(m -> m.role() == io.github.hvmello.aienglab.shared.Message.Role.TOOL)
+                    .map(io.github.hvmello.aienglab.shared.Message::content))
+                    .anyMatch(m -> m.contains("invalid_arguments"));
+        }
+        assertThat(WriteNoteTool.hasInvisibleCharacter("naïve éè 中文")).isFalse();
+    }
+
+    @Test
+    void writeExecutesAndReportsCreatedOrOverwritten() throws Exception {
+        var store = new NoteStore();
+        var tool = new WriteNoteTool(store);
+
+        assertThat(tool.execute(tool.parse(json("{\"name\":\"a\",\"content\":\"1\"}"))).toString())
+                .isEqualTo("{\"name\":\"a\",\"written\":true,\"created\":true}");
+        assertThat(tool.execute(tool.parse(json("{\"name\":\"a\",\"content\":\"2\"}"))).path("created").asBoolean())
+                .isFalse();
+        assertThat(store.read("a")).contains("2");
+    }
+
+    @Test
+    void theApprovalSummaryNamesTheActionAndTheDetailCarriesAllContent() throws Exception {
+        var store = new NoteStore();
+        store.write("a", "old");
+        var tool = new WriteNoteTool(store);
+
+        String overwrite = tool.summarize(tool.parse(json("{\"name\":\"a\",\"content\":\"new\"}")));
+        String create = tool.summarize(tool.parse(json("{\"name\":\"b\",\"content\":\"" + "y".repeat(500) + "\"}")));
+
+        assertThat(overwrite).isEqualTo("overwrite note 'a' with 3 characters");
+        assertThat(create).isEqualTo("create note 'b' with 500 characters");
+
+        var longArgs = tool.parse(json("{\"name\":\"b\",\"content\":\"" + "y".repeat(1990) + "END\"}"));
+        assertThat(tool.asAgentTool().summary().detail(longArgs)).isEqualTo("y".repeat(1990) + "END");
+    }
+
+    @Test
+    void toolsRegisterWithTheRightPermissions() {
+        var store = new NoteStore();
+
+        assertThat(new ListNotesTool(store).asAgentTool().permission()).isEqualTo(Permission.READ);
+        assertThat(new ReadNoteTool(store).asAgentTool().permission()).isEqualTo(Permission.READ);
+        assertThat(new WriteNoteTool(store).asAgentTool().permission()).isEqualTo(Permission.WRITE);
+    }
+}
