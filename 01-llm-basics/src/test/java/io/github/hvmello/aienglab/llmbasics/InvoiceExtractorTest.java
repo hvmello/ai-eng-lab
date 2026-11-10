@@ -181,7 +181,7 @@ class InvoiceExtractorTest {
 
     @Test
     void extremeExponentsFailQuicklyAsInvalidValues() {
-        for (String value : new String[] {"1e-500000000", "1e999999999"}) {
+        for (String value : new String[] {"1e-500000000", "1e999999999", "1e2147483647"}) {
             String output = """
                     {"vendor":"Northwind Traders","currency":"USD","issueDate":"2026-03-14",
                      "lineItems":[{"description":"Dock","quantity":1,"unitPrice":10},
@@ -196,6 +196,9 @@ class InvoiceExtractorTest {
                  "total":1e-500000000}""";
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(5),
                 () -> assertFailure(hugeTotal, InvalidValue.class));
+        String overflowTotal = hugeTotal.replace("1e-500000000", "1e2147483647");
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(5),
+                () -> assertFailure(overflowTotal, InvalidValue.class));
     }
 
     @Test

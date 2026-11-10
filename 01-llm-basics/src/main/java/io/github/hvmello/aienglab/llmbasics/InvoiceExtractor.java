@@ -166,7 +166,7 @@ public final class InvoiceExtractor {
     }
 
     private static void requireReasonableAmount(BigDecimal amount, String field, String raw) {
-        if (amount.scale() > MAX_SCALE || amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
+        if (amount.scale() > MAX_SCALE || (long) amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
             throw new InvalidValue(field + " is outside the supported range (scale " + amount.scale()
                     + ", precision " + amount.precision() + ")", raw);
         }
