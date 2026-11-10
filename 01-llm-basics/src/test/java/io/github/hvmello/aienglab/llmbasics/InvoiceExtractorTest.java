@@ -161,6 +161,24 @@ class InvoiceExtractorTest {
     }
 
     @Test
+    void amountsThatDifferOnlyPastDoublePrecisionAreInvalidValues() {
+        String output = """
+                {"vendor":"Northwind Traders","currency":"USD","issueDate":"2026-03-14",
+                 "lineItems":[{"description":"Dock","quantity":1,"unitPrice":12345678901234567.89}],
+                 "total":12345678901234567.80}""";
+        assertFailure(output, InvalidValue.class);
+    }
+
+    @Test
+    void highPrecisionAmountsAreKeptExactly() {
+        String output = """
+                {"vendor":"Northwind Traders","currency":"USD","issueDate":"2026-03-14",
+                 "lineItems":[{"description":"Dock","quantity":1,"unitPrice":12345678901234567.89}],
+                 "total":12345678901234567.89}""";
+        assertThat(extract(output).total()).isEqualByComparingTo(new BigDecimal("12345678901234567.89"));
+    }
+
+    @Test
     void badCurrencyIsAnInvalidValue() {
         assertFailure(valid("\"USD\"", "\"DOLLARS\""), InvalidValue.class);
         assertFailure(valid("\"USD\"", "\"usd\""), InvalidValue.class);
