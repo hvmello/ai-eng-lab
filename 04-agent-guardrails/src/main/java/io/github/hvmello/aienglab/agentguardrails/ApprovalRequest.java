@@ -37,18 +37,23 @@ public record ApprovalRequest(String tool, int step, String summary, String deta
         this(tool, step, summary, "");
     }
 
-    /** Removes ANSI sequences, turns other control characters into spaces, drops invisible format characters. */
+    /**
+     * Removes ANSI sequences and turns control characters and whitespace into spaces. Invisible format and tag
+     * characters are not dropped: each one is shown as a visible escape such as backslash, u and the hex code point in braces, so the approver
+     * sees everything that would be stored. Walks code points, so supplementary characters are classified correctly.
+     */
     static String sanitize(String text, int max) {
         StringBuilder clean = new StringBuilder();
         String withoutAnsi = ANSI.matcher(text).replaceAll(" ");
-        for (int i = 0; i < withoutAnsi.length(); i++) {
-            char c = withoutAnsi.charAt(i);
-            if (Character.isISOControl(c) || Character.isWhitespace(c)) {
+        withoutAnsi.codePoints().forEach(cp -> {
+            if (Character.isISOControl(cp) || Character.isWhitespace(cp)) {
                 clean.append(' ');
-            } else if (Character.getType(c) != Character.FORMAT) {
-                clean.append(c);
+            } else if (Character.getType(cp) == Character.FORMAT || cp >= 0xE0000 && cp <= 0xE007F) {
+                clean.append('\\').append("u{").append(Integer.toHexString(cp).toUpperCase(java.util.Locale.ROOT)).append('}');
+            } else {
+                clean.appendCodePoint(cp);
             }
-        }
+        });
         String line = clean.toString().replaceAll(" {2,}", " ").strip();
         if (line.length() <= max) {
             return line;

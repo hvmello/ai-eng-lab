@@ -111,6 +111,23 @@ class NoteToolsTest {
     }
 
     @Test
+    void writeRejectsContentTheApproverCouldNotSee() {
+        var tool = new WriteNoteTool(new NoteStore());
+        String tagged = "buy bread" + new String(Character.toChars(0xE0041));
+
+        assertThat(WriteNoteTool.hasInvisibleCharacter(tagged)).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("a\u200Bb")).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("a\u202Eb")).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("a\u001B[2Jb")).isTrue();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("line one\n\tline two")).isFalse();
+        assertThat(WriteNoteTool.hasInvisibleCharacter("caf\u00E9 \uD83D\uDE00")).isFalse();
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\",\"content\":\"x\u200By\"}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+        assertThatThrownBy(() -> tool.parse(json("{\"name\":\"a\",\"content\":\"x\uDB40\uDC41y\"}")))
+                .isInstanceOf(InvalidArgumentsException.class);
+    }
+
+    @Test
     void writeExecutesAndReportsCreatedOrOverwritten() throws Exception {
         var store = new NoteStore();
         var tool = new WriteNoteTool(store);

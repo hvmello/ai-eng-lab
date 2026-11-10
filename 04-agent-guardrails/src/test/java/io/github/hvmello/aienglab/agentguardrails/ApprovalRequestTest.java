@@ -41,9 +41,16 @@ class ApprovalRequestTest {
     }
 
     @Test
-    void invisibleFormatCharactersAreDropped() {
+    void invisibleFormatCharactersAreShownAsVisibleEscapes() {
         // U+202E reverses the text direction, U+200B is a zero width space.
-        assertThat(summary("a‮b​c")).isEqualTo("abc");
+        assertThat(summary("a\u202Eb\u200Bc")).isEqualTo("a\\" + "u{202E}b\\" + "u{200B}c");
+    }
+
+    @Test
+    void supplementaryTagCharactersAreShownAsVisibleEscapes() {
+        String tagA = new String(Character.toChars(0xE0041));
+
+        assertThat(summary("x" + tagA + "y")).isEqualTo("x\\" + "u{E0041}y");
     }
 
     @Test
