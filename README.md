@@ -9,7 +9,7 @@ module runs on local models through Ollama at no cost, with hosted providers opt
 |---|---|---|
 | [01-llm-basics](01-llm-basics/README.md) | Chat, streaming, parameters, structured output into Java records | Implemented |
 | [02-tool-calling](02-tool-calling/README.md) | Java tools, invalid calls and error handling, with LangChain4j and Spring AI | Implemented |
-| 03-mcp-server | An MCP server in Java, exposing tools and resources | Planned |
+| [03-mcp-server](03-mcp-server/README.md) | A read-only MCP server in Java over Streamable HTTP, behind OAuth | Implemented, not yet validated with a real client |
 | 04-agent-guardrails | Tool loop, step limits, permissions, prompt injection tests | Planned |
 | 08-capstone | [evidence-gate](https://github.com/hvmello/evidence-gate): RAG, evaluation, guardrails and observability | In progress |
 

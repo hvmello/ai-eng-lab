@@ -1,0 +1,44 @@
+# The server is OFF by default. Nothing below is read unless aienglab.mcp.enabled=true,
+# because main() exits before it opens a port or touches the database.
+aienglab:
+  mcp:
+    enabled: false
+    # Canonical origin of this server. The protected resource is <base-url>/mcp.
+    base-url: ${MCP_BASE_URL:http://127.0.0.1:8080}
+    # Single configured user. No defaults are committed: startup fails when enabled without them.
+    user: ${MCP_USER:}
+    user-password-hash: ${MCP_USER_PASSWORD_HASH:}
+    # HMAC key for pagination cursors, at least 32 characters.
+    cursor-key: ${MCP_CURSOR_KEY:}
+
+server:
+  address: 127.0.0.1
+  port: 8080
+
+spring:
+  application:
+    name: mcp-server
+  main:
+    banner-mode: "off"
+  datasource:
+    url: ${MCP_DB_URL:jdbc:postgresql://127.0.0.1:5432/mcp}
+    username: ${MCP_DB_USER:mcp}
+    password: ${MCP_DB_PASSWORD:}
+  autoconfigure:
+    # Access tokens are opaque, so the JWT/JWKS beans of the authorization server are not needed.
+    exclude: org.springframework.boot.security.oauth2.server.authorization.autoconfigure.servlet.OAuth2AuthorizationServerJwtAutoConfiguration
+  ai:
+    mcp:
+      server:
+        name: docs-mcp-server
+        version: 0.1.0
+        type: SYNC
+        # Streamable HTTP without server-side sessions: every request carries its own bearer token.
+        protocol: STATELESS
+        streamable-http:
+          mcp-endpoint: /mcp
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
