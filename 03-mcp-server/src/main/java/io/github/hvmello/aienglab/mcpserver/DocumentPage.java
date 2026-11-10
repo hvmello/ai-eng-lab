@@ -12,8 +12,13 @@ public final class DocumentPage {
 
   public record Slice(
       long id, String title, Instant updatedAt, int totalChars, int offset, String text) {
+    /** Characters in the text as PostgreSQL counts them (code points), not UTF-16 units. */
+    public int chars() {
+      return text.codePointCount(0, text.length());
+    }
+
     public boolean hasMore() {
-      return offset + text.length() < totalChars;
+      return (long) offset + chars() < totalChars;
     }
   }
 

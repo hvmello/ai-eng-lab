@@ -113,6 +113,39 @@ class McpFlowIT extends McpIT {
   }
 
   @Test
+  void aPaginatedReadKeepsEveryCharacterOutsideTheBasicMultilingualPlane() {
+    // Supplementary characters are 2 UTF-16 units in Java but 1 character in PostgreSQL. The body
+    // puts them across the 120 character page boundary.
+    String body = ("ab😀cdefg🚀").repeat(30);
+    long id =
+        jdbc.queryForObject(
+            "INSERT INTO documents (title, body) VALUES ('emoji paging probe', ?) RETURNING id",
+            Long.class,
+            body);
+    try {
+      OAuthTestClient client = browser();
+      String token = client.signIn(REDIRECT).tokens().accessToken();
+
+      StringBuilder text = new StringBuilder();
+      String cursor = null;
+      int pages = 0;
+      do {
+        String args =
+            "{\"id\":" + id + (cursor == null ? "" : ",\"cursor\":\"" + cursor + "\"") + "}";
+        JsonNode page = OAuthTestClient.toolPayload(client.callTool(token, "read_document", args));
+        text.append(page.get("text").asString());
+        cursor = page.has("next_cursor") ? page.get("next_cursor").asString() : null;
+        pages++;
+      } while (cursor != null && pages < 50);
+
+      assertThat(text.toString()).isEqualTo(body);
+      assertThat(pages).isEqualTo((body.codePointCount(0, body.length()) + 119) / 120);
+    } finally {
+      jdbc.update("DELETE FROM documents WHERE id = ?", id);
+    }
+  }
+
+  @Test
   void aTamperedOrForeignCursorIsAToolError() {
     OAuthTestClient client = browser();
     String token = client.signIn(REDIRECT).tokens().accessToken();

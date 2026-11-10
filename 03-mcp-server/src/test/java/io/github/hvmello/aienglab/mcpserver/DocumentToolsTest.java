@@ -169,6 +169,24 @@ class DocumentToolsTest {
   }
 
   @Test
+  void pagingCountsCodePointsNotUtf16Units() {
+    McpTransportContext context = authorized("docs.read");
+    // "ab" + emoji + "cdefg" is 8 code points but 9 UTF-16 units; the first page holds 3 of them.
+    repository.slice = new Slice(1, "t", NOW, 8, 0, "ab😀");
+    JsonNode first = body(tools.readDocument(context, 1L, null));
+    String cursor = first.get("next_cursor").asString();
+
+    // The next page must start at code point 3, not at UTF-16 unit 4.
+    byte[] key = "c".repeat(40).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    assertThat(Cursor.decode(cursor, key, Cursor.READ, "1").position()).isEqualTo(3);
+
+    // A last page that ends with an emoji is the end of the body, not a page with more to come.
+    repository.slice = new Slice(1, "t", NOW, 5, 3, "c😀");
+    JsonNode last = body(tools.readDocument(context, 1L, null));
+    assertThat(last.has("next_cursor")).isFalse();
+  }
+
+  @Test
   void missingDocumentIsATypedError() {
     McpTransportContext context = authorized("docs.read");
     repository.slice = null;

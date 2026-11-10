@@ -148,7 +148,7 @@ public class DocumentTools {
           out.put("offset", slice.offset());
           out.put("text", slice.text());
           if (slice.hasMore()) {
-            long next = (long) slice.offset() + slice.text().length();
+            long next = (long) slice.offset() + slice.chars();
             out.put("next_cursor", new Cursor(Cursor.READ, binding, next).encode(cursorKey));
           }
           return out;
